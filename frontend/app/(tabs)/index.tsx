@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, FlatList, TouchableOpacity, Modal, TextInput, Button, StyleSheet, ActivityIndicator } from 'react-native';
 
-const BACKEND_URL = 'http://192.168.0.101:8000';
+const BACKEND_URL = 'http://localhost:8000';
 
 // Define types for book and order result
 interface Book {
