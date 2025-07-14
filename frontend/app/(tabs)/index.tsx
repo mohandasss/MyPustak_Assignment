@@ -3,25 +3,49 @@ import { View, Text, FlatList, TouchableOpacity, Modal, TextInput, Button, Style
 
 const BACKEND_URL = 'http://192.168.0.101:8000';
 
+// Define types for book and order result
+interface Book {
+  id: number;
+  title: string;
+  author: string;
+}
+interface OrderResult {
+  message?: string;
+  error?: string;
+  [key: string]: any;
+}
+
 export default function BooksListScreen() {
-  const [books, setBooks] = useState([]);
+  const [books, setBooks] = useState<Book[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
-  const [selectedBook, setSelectedBook] = useState(null);
+  const [selectedBook, setSelectedBook] = useState<Book | null>(null);
   const [customerName, setCustomerName] = useState('');
-  const [orderResult, setOrderResult] = useState(null);
+  const [orderResult, setOrderResult] = useState<OrderResult | null>(null);
   const [orderLoading, setOrderLoading] = useState(false);
 
   useEffect(() => {
-    fetch(`${BACKEND_URL}/books`)
-      .then(res => res.json())
-      .then(data => {
+    // Fetch the list of books from the backend
+    const fetchBooks = async () => {
+      try {
+        const res = await fetch(`${BACKEND_URL}/books`);
+        if (!res.ok) {
+          throw new Error(`HTTP error! status: ${res.status}`);
+        }
+        const data: Book[] = await res.json();
         setBooks(data);
+      } catch (error: any) {
+        setBooks([]);
+        // Show a user-friendly error message if fetch fails
+        setOrderResult({ error: 'Failed to fetch books. Please check your network or backend.' });
+      } finally {
         setLoading(false);
-      });
+      }
+    };
+    fetchBooks();
   }, []);
 
-  const openOrderForm = (book) => {
+  const openOrderForm = (book: Book) => {
     setSelectedBook(book);
     setCustomerName('');
     setOrderResult(null);
@@ -32,20 +56,31 @@ export default function BooksListScreen() {
     setOrderLoading(true);
     setOrderResult(null);
     try {
+      // Place an order by sending book_id and customer_name to the backend
       const res = await fetch(`${BACKEND_URL}/order`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ book_id: selectedBook.id, customer_name: customerName })
+        body: JSON.stringify({ book_id: selectedBook?.id, customer_name: customerName })
       });
-      const data = await res.json();
+      if (!res.ok) {
+        // Try to parse error message from backend
+        let data: OrderResult;
+        try {
+          data = await res.json();
+        } catch {
+          data = { error: `HTTP error! status: ${res.status}` };
+        }
+        throw new Error(data.error || `HTTP error! status: ${res.status}`);
+      }
+      const data: OrderResult = await res.json();
       setOrderResult(data.message ? data : { error: data.error });
-    } catch (e) {
-      setOrderResult({ error: 'Network error' });
+    } catch (e: any) {
+      setOrderResult({ error: e.message || 'Network error' });
     }
     setOrderLoading(false);
   };
 
-  if (loading) return <View style={styles.center}><ActivityIndicator size="large" /></View>;
+  if (loading) return <View style={styles.center}><ActivityIndicator size="large" /><Text>Loading books...</Text></View>;
 
   return (
     <View style={styles.center}>
@@ -61,6 +96,7 @@ export default function BooksListScreen() {
         )}
         style={{ width: '100%' }}
         contentContainerStyle={{ alignItems: 'center' }}
+        ListEmptyComponent={<Text style={{ color: 'red', marginTop: 20 }}>No books found or failed to load.</Text>}
       />
       <Modal visible={modalVisible} transparent animationType="slide">
         <View style={styles.modalBg}>
